@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Виртуальное окружение
+.venv/
+.venv-test/
+venv/
+env/
+
+# Рантайм-данные приложения (БД, загруженные отчёты, результаты прогонов)
+# Эти каталоги создаются при запуске и содержат живые данные — не в git.
+/data/
+design/app/data/
+**/data/projects/
+*.sqlite3
+*.db
+
+# Артефакты сборки Allure (локальный вывод `allure generate`)
+allure-report/
+allure-results/
+build/
+dist/
+
+# Локальное окружение и инструменты
+.env
+.env.*
+!.env.example
+.cursor/
+.idea/
+.vscode/
+.DS_Store

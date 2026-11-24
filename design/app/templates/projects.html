@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ m.projects }} — {{ m.brand }}{% endblock %}
+{% block body %}
+<div class="page-head">
+  <div>
+    <h1>{{ m.projects }}</h1>
+    <p class="lead">{{ m.shelf_lead }}</p>
+  </div>
+</div>
+
+{% if projects %}
+  <ul class="project-grid">
+    {% for project in projects %}
+      {% set picture = sparks.get(project.slug) %}
+      {% set bad = (project.failed or 0) + (project.broken or 0) %}
+      <li class="card project-card">
+        <div class="card-top">
+          <a href="/project/{{ project.slug }}"><h2>{{ project.name }}</h2></a>
+          <span class="card-side">
+            {% if project.total %}
+              <span class="status {{ 'fail' if bad else 'pass' }}"><i class="dot"></i>{{ m.status_failed if bad else m.status_passed }}</span>
+            {% endif %}
+            {% if actor.is_admin %}
+              <span class="menu">
+                <button type="button" class="more" aria-expanded="false" aria-label="{{ m.more }}">⋯</button>
+                <span class="menu-pop" hidden>
+                  <button type="button" class="rename" data-slug="{{ project.slug }}" data-name="{{ project.name }}">{{ m.rename }}</button>
+                  <button type="submit" class="danger" form="delete-{{ project.slug }}">{{ m.delete_project }}</button>
+                </span>
+              </span>
+            {% endif %}
+          </span>
+        </div>
+        <a class="card-body" href="/project/{{ project.slug }}">
+          {% if project.total %}
+            <p class="meta">{{ format_when(project.run_created) }}{% if project.executor_name %} · {{ project.executor_name }}{% elif inside.get(project.slug) %} · {{ inside[project.slug]|join(' · ') }}{% endif %}</p>
+            {% if picture %}
+              <svg class="spark" width="112" height="32" viewBox="0 0 112 32" aria-hidden="true">
+                <polygon points="{{ picture.area }}" fill="{{ '#e5484d' if bad else '#3f9d4a' }}" opacity="0.14"></polygon>
+                <polyline points="{{ picture.line }}" fill="none" stroke="{{ '#e5484d' if bad else '#3f9d4a' }}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></polyline>
+              </svg>
+            {% endif %}
+          {% else %}
+            <p class="meta">{{ m.no_reports }}</p>
+          {% endif %}
+        </a>
+        {% if actor.is_admin %}
+          <form id="delete-{{ project.slug }}" method="post" action="/projects/{{ project.slug }}/delete" onsubmit="return confirm('{{ m.confirm_project }}')"></form>
+        {% endif %}
+        {% if actor.is_admin or actor.role == "uploader" %}
+          <a class="upload-btn" href="/project/{{ project.slug }}#upload">{{ m.upload_results }}</a>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="card empty">{{ m.empty }}</p>
+{% endif %}
+
+{% if actor.is_admin %}
+<section class="split">
+  <form method="post" action="/projects" class="card form create-row">
+    <input name="name" required placeholder="{{ m.project_name }}" aria-label="{{ m.project_name }}" autocomplete="off">
+    <button type="submit">{{ m.create }}</button>
+  </form>
+  <form method="post" action="/users" class="card form">
+    <h2>{{ m.new_user }}</h2>
+    <input name="username" required placeholder="{{ m.username }}" aria-label="{{ m.username }}" autocomplete="off">
+    <input name="password" type="password" required minlength="6" placeholder="{{ m.password }}" aria-label="{{ m.password }}">
+    <select name="role" aria-label="{{ m.role }}">
+      <option value="guest">{{ m.guest }}</option>
+      <option value="admin">{{ m.admin }}</option>
+    </select>
+    <button type="submit">{{ m.add }}</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>{{ m.who }}</h2>
+  <ul class="people">
+    {% for user in users %}
+      <li>
+        <span>{{ user.username }}</span>
+        <span class="plain">{{ m.admin if user.role == "admin" else m.guest }}</span>
+        {% if user.id != actor.user_id %}
+          <form method="post" action="/users/{{ user.id }}/delete" onsubmit="return confirm('{{ m.confirm_user }}'.replace('{name}', '{{ user.username }}'))">
+            <button class="ghost" type="submit">{{ m.delete_user }}</button>
+          </form>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

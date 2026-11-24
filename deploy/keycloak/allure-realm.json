@@ -1,0 +1,53 @@
+{
+  "realm": "allure",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "requiredActions": [
+    {
+      "alias": "VERIFY_PROFILE",
+      "name": "Verify Profile",
+      "providerId": "VERIFY_PROFILE",
+      "enabled": false,
+      "defaultAction": false,
+      "priority": 10
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "allure",
+      "name": "Allure",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "allure-dev-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://127.0.0.1:8090/auth/callback",
+        "http://localhost:8090/auth/callback"
+      ],
+      "webOrigins": [
+        "http://127.0.0.1:8090",
+        "http://localhost:8090"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@local",
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "Local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ m.login }} — {{ m.brand }}{% endblock %}
+{% block body %}
+<section class="login">
+  <p class="eyebrow">{{ m.login_kicker }}</p>
+  <h1>{{ m.login_title }}</h1>
+  <p class="lead">{{ m.login_lead }}</p>
+  {% if error %}
+    <p class="flash err">{{ error }}</p>
+  {% endif %}
+  <form method="post" action="/login" class="card form">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>{{ m.username }} <input name="username" autocomplete="username" required autofocus></label>
+    <label>{{ m.password }} <input name="password" type="password" autocomplete="current-password" required></label>
+    <button type="submit">{{ m.login }}</button>
+  </form>
+</section>
+{% endblock %}

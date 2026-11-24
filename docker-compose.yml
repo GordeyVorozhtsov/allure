@@ -1,0 +1,56 @@
+# Стенд на 8090: полноценный бэкенд Allure<3 (FastAPI) + дизайн-фронт index.html.
+# Люди входят через Keycloak. GitLab шлёт zip токеном проекта, не через браузер.
+# Это замена 8070: загрузка результатов, сборка Allure 2/3, проекты, прогоны, ветки,
+# CI-токены, гостевая ссылка, badge.
+
+name: allure3
+
+services:
+  design:
+    build:
+      context: .
+      dockerfile: Dockerfile.design
+    ports:
+      - "8090:8090"
+    environment:
+      DATA_DIR: /data
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin
+      SECRET_KEY: dev-only-secret
+      SESSION_SECRET: dev-only-secret
+      KEEP_REPORTS: "20"
+      MAX_UPLOAD_MB: "100"
+      MAX_UNPACKED_MB: "500"
+      KEYCLOAK_ISSUER: http://127.0.0.1:8088/realms/allure
+      KEYCLOAK_INTERNAL_ISSUER: http://keycloak:8080/realms/allure
+      KEYCLOAK_CLIENT: allure
+      KEYCLOAK_SECRET: allure-dev-secret
+      BASE_URL: http://127.0.0.1:8090
+      ALLURE_BIN: /usr/local/bin/allure
+      ALLURE3_BIN: /usr/local/bin/allure3
+    volumes:
+      - allure3-data:/data
+    depends_on:
+      - keycloak
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: http://127.0.0.1:8088
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8088:8080"
+    volumes:
+      - ./deploy/keycloak/allure-realm.json:/opt/keycloak/data/import/allure-realm.json:ro
+    restart: unless-stopped
+
+volumes:
+  allure3-data:
+    external: true
+    name: pyallure_allure3-data

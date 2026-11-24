@@ -1,0 +1,50 @@
+# Стенд 8090: полноценный бэкенд Allure<3 (FastAPI) + дизайн-фронт index.html.
+# Бэкенд-пакет живёт в design/app/server (импортируется как `server`), дизайн-интерфейс — в design/.
+# Для сборки Allure-отчётов нужен тот же runtime, что и у бэкенда 8070: Java + allure2 + Node + allure3.
+
+FROM python:3.12-slim-bookworm
+
+ARG ALLURE_VERSION=2.46.1
+ARG NODE_VERSION=22.21.1
+ARG ALLURE3_VERSION=3.22.1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openjdk-17-jre-headless ca-certificates curl tar bash \
+    && curl -fsSL -o /tmp/allure.tgz "https://github.com/allure-framework/allure2/releases/download/${ALLURE_VERSION}/allure-${ALLURE_VERSION}.tgz" \
+    && tar -xzf /tmp/allure.tgz -C /opt \
+    && rm /tmp/allure.tgz \
+    && arch="$(dpkg --print-architecture)" \
+    && case "$arch" in amd64) node_arch=x64 ;; arm64) node_arch=arm64 ;; *) echo "unsupported $arch" && exit 1 ;; esac \
+    && curl -fsSL -o /tmp/node.tar.gz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.gz" \
+    && tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 \
+    && rm /tmp/node.tar.gz \
+    && npm install -g "allure@${ALLURE3_VERSION}" \
+    && mv /usr/local/bin/allure /usr/local/bin/allure3 \
+    && ln -sf "/opt/allure-${ALLURE_VERSION}/bin/allure" /usr/local/bin/allure \
+    && apt-get purge -y curl \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY design ./design
+
+# Рабочая директория — там, где лежит пакет `server` (design/app) для импорта.
+WORKDIR /app/design/app
+RUN pip install --no-cache-dir -r requirements.txt
+
+ENV DATA_DIR=/data \
+    PORT=8090 \
+    ALLURE_BIN=/usr/local/bin/allure \
+    ALLURE3_BIN=/usr/local/bin/allure3 \
+    PYTHONUNBUFFERED=1 \
+    FORWARDED_ALLOW_IPS=* \
+    BASE_URL=http://127.0.0.1:8090
+
+RUN mkdir -p /data
+VOLUME /data
+EXPOSE 8090
+
+HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=8 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health')"
+
+CMD ["python", "-m", "server"]

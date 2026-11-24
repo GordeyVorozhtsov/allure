@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Allure<3{% endblock %}
+{% block body %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow"><a href="/">{{ m.projects }}</a> / {{ project.slug }}</p>
+    <div class="title-row">
+      <h1>{{ project.name }}</h1>
+      {% if actor.is_admin %}
+        <div class="menu">
+          <button type="button" class="more" aria-expanded="false" aria-label="{{ m.more }}">⋯</button>
+          <div class="menu-pop" hidden>
+            <button type="button" class="rename" data-slug="{{ project.slug }}" data-name="{{ project.name }}">{{ m.rename }}</button>
+            <form method="post" action="/projects/{{ project.slug }}/delete" onsubmit="return confirm('{{ m.confirm_project }}')">
+              <button class="danger" type="submit">{{ m.delete_project }}</button>
+            </form>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="head-actions">
+    {% if latest %}
+      <a class="ghost linkish" href="/reports/{{ project.slug }}/latest">{{ m.latest_report }}</a>
+    {% endif %}
+    {% if actor.is_admin or actor.role == "uploader" %}
+      <button type="button" class="button" id="open-upload">{{ m.upload }}</button>
+    {% endif %}
+  </div>
+</div>
+
+<section class="stats">
+  {% if latest %}
+    {% set c = latest.counts %}
+    <div class="fill" role="img" aria-label="{{ c.passed }} {{ m.passed }}, {{ c.failed }} {{ m.failed }}, {{ c.broken }} {{ m.broken }}, {{ c.skipped }} {{ m.skipped }}">
+      <i class="pass" style="flex-grow: {{ c.passed|int }}"></i>
+      <i class="fail" style="flex-grow: {{ c.failed|int }}"></i>
+      <i class="broken" style="flex-grow: {{ c.broken|int }}"></i>
+      <i class="skip" style="flex-grow: {{ c.skipped|int }}"></i>
+      <i class="unknown" style="flex-grow: {{ (c.unknown or 0)|int }}"></i>
+    </div>
+    <div><b class="pass">{{ c.passed }}</b><span>{{ m.passed }}</span></div>
+    <div><b class="fail">{{ c.failed }}</b><span>{{ m.failed }}</span></div>
+    <div><b class="broken">{{ c.broken }}</b><span>{{ m.broken }}</span></div>
+    <div><b class="skip">{{ c.skipped }}</b><span>{{ m.skipped }}</span></div>
+  {% else %}
+    <p class="plain">{{ m.no_ready }}</p>
+  {% endif %}
+</section>
+
+<section class="card" id="runs">
+  <div class="run-head">
+    <h2>{{ m.runs }}</h2>
+    {% if sources %}
+      <form method="get" action="/project/{{ project.slug }}#runs">
+        <select name="source" onchange="this.form.submit()" aria-label="{{ m.runs }}">
+          <option value="">{{ m.all_uploads }}</option>
+          {% for name in sources %}
+            <option value="{{ name }}" {% if selected == name %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    {% endif %}
+  </div>
+  {% if rows %}
+    <ul class="run-list">
+      {% for row in rows %}
+        {% set run = row.run %}
+        <li>
+          <div class="run-main">
+            <strong>
+              {% if run.executor_name %}{{ run.executor_name }}{% else %}#{{ run.build_order }}{% endif %}
+            </strong>
+            <span class="plain">
+              {{ format_when(run.created_at) }}
+              {% if not selected and row.parts|length > 1 %}
+                · {{ row.parts|map(attribute='source')|join(' · ') }}
+              {% elif selected %}
+                · {{ selected }}
+              {% endif %}
+            </span>
+            {% if run.status == "ready" %}
+              {% set c = row.counts %}
+              <span class="fill" aria-hidden="true">
+                <i class="pass" style="flex-grow: {{ c.passed|int }}"></i>
+                <i class="fail" style="flex-grow: {{ c.failed|int }}"></i>
+                <i class="broken" style="flex-grow: {{ c.broken|int }}"></i>
+                <i class="skip" style="flex-grow: {{ c.skipped|int }}"></i>
+                <i class="unknown" style="flex-grow: {{ (c.unknown or 0)|int }}"></i>
+              </span>
+              <span class="outcome">
+                <span class="pass">{{ c.passed }}</span>
+                <span class="fail">{{ c.failed }}</span>
+                <span class="broken">{{ c.broken }}</span>
+                <span class="skip">{{ c.skipped }}</span>
+              </span>
+            {% elif run.status == "building" %}
+              <span class="plain">{{ m.building }}</span>
+            {% else %}
+              <span class="fail">{{ m.not_built }}</span>
+              {% if run.error %}<span class="plain block">{{ run.error }}</span>{% endif %}
+            {% endif %}
+          </div>
+          <div class="actions">
+            {% if run.status == "ready" %}
+              <a href="/reports/{{ project.slug }}/{{ run.id }}/index.html">Allure 2</a>
+              {% if row.report3 %}
+                <a href="/reports/{{ project.slug }}/{{ run.id }}/v3/index.html">Allure 3</a>
+              {% endif %}
+              <a href="/projects/{{ project.slug }}/runs/{{ run.id }}/download">{{ m.download }}</a>
+              {% if run.share_token %}
+                <a href="/s/{{ run.share_token }}">/s/{{ run.share_token }}</a>
+                <form method="post" action="/projects/{{ project.slug }}/runs/{{ run.id }}/unshare">
+                  <button class="ghost" type="submit">{{ m.close_link }}</button>
+                </form>
+              {% else %}
+                <button class="ghost share-open" type="button" data-slug="{{ project.slug }}" data-run="{{ run.id }}">{{ m.give_link }}</button>
+              {% endif %}
+            {% endif %}
+            {% if actor.is_admin %}
+              <form method="post" action="/projects/{{ project.slug }}/runs/{{ run.id }}/delete" onsubmit="return confirm('{{ m.confirm_run }}'.replace('{n}', '{{ run.build_order }}'))">
+                <button class="ghost danger" type="submit">{{ m.delete_run }}</button>
+              </form>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="plain">{{ m.no_rows }}</p>
+  {% endif %}
+</section>
+
+<div class="split detail-grid">
+  <section class="card">
+    <h2>{{ m.links }}</h2>
+    <p class="plain">{{ m.latest_here }}</p>
+    <code class="block">/reports/{{ project.slug }}/latest</code>
+    <p class="plain">{{ m.badge }}</p>
+    <img alt="бейдж" src="/projects/{{ project.slug }}/badge.svg">
+    <code class="block">{{ base_url }}/projects/{{ project.slug }}/badge.svg</code>
+  </section>
+
+  {% if actor.is_admin %}
+  <section class="card" id="gitlab">
+    <h2>{{ m.gitlab_title }}</h2>
+    <p class="plain">{{ m.gitlab_help }}</p>
+    <form method="post" action="/projects/{{ project.slug }}/tokens" class="form tight">
+      <input name="name" required placeholder="gitlab" aria-label="{{ m.username }}" autocomplete="off">
+      <button type="submit">{{ m.issue }}</button>
+    </form>
+    {% if tokens %}
+      <ul class="people">
+        {% for token in tokens %}
+          <li>
+            <span>{{ token.name }}</span>
+            <code>{{ token.token_prefix }}…</code>
+            <form method="post" action="/projects/{{ project.slug }}/tokens/{{ token.id }}/delete">
+              <button class="ghost" type="submit">{{ m.revoke }}</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    <pre class="curl">curl -F files=@results.zip \
+  -F execution_name=gitlab \
+  -F execution_url="$CI_PIPELINE_URL" \
+  -F execution_type=gitlab \
+  -F execution_branch="$CI_COMMIT_REF_NAME" \
+  -F environment="$CI_PROJECT_NAME" \
+  -H "X-API-Token: $ALLURE_TOKEN" \
+  {{ base_url }}/projects/{{ project.slug }}/results</pre>
+  </section>
+
+  <form method="post" action="/projects/{{ project.slug }}/settings" class="card form tight">
+    <h2>{{ m.keep }}</h2>
+    <label>{{ m.keep_label }}
+      <input name="keep_reports" type="number" min="1" max="100" value="{{ project.keep_reports }}">
+    </label>
+    <button type="submit">{{ m.save }}</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if actor.is_admin or actor.role == "uploader" %}
+<dialog id="upload-dialog" class="sheet">
+  <form class="form" method="post" action="/projects/{{ project.slug }}/results" enctype="multipart/form-data" id="upload-form">
+    <div class="sheet-head">
+      <h2>{{ m.upload }}</h2>
+      <button type="button" class="ghost" id="upload-close">{{ m.close }}</button>
+    </div>
+    <input type="hidden" name="response" value="html">
+    <label class="drop" id="drop">
+      <input id="files" type="file" name="files" accept=".zip,application/zip" required>
+      <p>{{ m.drop }}</p>
+    </label>
+    <input id="source" type="hidden" name="source">
+    <div id="job" hidden>
+      <div class="job-row"><span id="job-label">{{ m.upload }}</span><span id="job-pct">0%</span></div>
+      <div class="track"><div id="job-bar"></div></div>
+    </div>
+    <button type="submit">{{ m.build }}</button>
+  </form>
+</dialog>
+<script>
+  const dialog = document.getElementById("upload-dialog");
+  const open = document.getElementById("open-upload");
+  const drop = document.getElementById("drop");
+  const input = document.getElementById("files");
+  const form = document.getElementById("upload-form");
+  const job = document.getElementById("job");
+  const bar = document.getElementById("job-bar");
+  open.addEventListener("click", () => dialog.showModal());
+  document.getElementById("upload-close").addEventListener("click", () => dialog.close());
+  if (location.hash === "#upload") dialog.showModal();
+  const label = drop.querySelector("p");
+  const show = () => {
+    const names = [...input.files].map((file) => file.name);
+    if (names.length) label.textContent = names.join(", ");
+  };
+  drop.addEventListener("dragover", (event) => { event.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (event) => {
+    event.preventDefault();
+    drop.classList.remove("over");
+    input.files = event.dataTransfer.files;
+    show();
+    peek();
+  });
+  input.addEventListener("change", () => { show(); peek(); });
+  const peek = async () => {
+    const zip = [...input.files].find((file) => file.name.toLowerCase().endsWith(".zip"));
+    const source = document.getElementById("source");
+    if (!zip) return;
+    const body = new FormData();
+    body.append("file", zip);
+    const response = await fetch("/api/peek", { method: "POST", body });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data.name && source) source.value = data.name;
+  };
+  form.addEventListener("submit", (event) => {
+    if (!input.files.length || !window.XMLHttpRequest) return;
+    event.preventDefault();
+    job.hidden = false;
+    const data = new FormData(form);
+    data.delete("response");
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", form.action);
+    xhr.upload.onprogress = (progress) => {
+      if (!progress.lengthComputable) return;
+      const pct = Math.round(progress.loaded / progress.total * 100);
+      bar.style.width = pct + "%";
+      document.getElementById("job-pct").textContent = pct + "%";
+      document.getElementById("job-label").textContent = pct < 100 ? "{{ m.upload }}" : "{{ m.building }}";
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        window.location = "/project/{{ project.slug }}";
+        return;
+      }
+      let detail = "{{ m.not_built }}";
+      try { detail = JSON.parse(xhr.responseText).detail || detail; } catch (error) {}
+      document.getElementById("job-label").textContent = detail;
+    };
+    xhr.send(data);
+  });
+</script>
+{% endif %}
+
+<dialog id="share-dialog" class="sheet">
+  <form class="form" id="share-form">
+    <div class="sheet-head">
+      <h2>{{ m.give_link }}</h2>
+      <button type="button" class="ghost" id="share-close">{{ m.close }}</button>
+    </div>
+    <p class="plain" id="share-hint"></p>
+    <fieldset id="share-ttl">
+      <label><input type="radio" name="ttl_hours" value="24" checked><span>24 часа</span></label>
+      <label><input type="radio" name="ttl_hours" value="168"><span>7 дней</span></label>
+      <label><input type="radio" name="ttl_hours" value="0"><span>Бессрочно</span></label>
+    </fieldset>
+    <div id="share-result" hidden>
+      <code class="block" id="share-url"></code>
+      <div class="sheet-actions">
+        <button type="button" class="button" id="share-copy">{{ m.copy }}</button>
+        <button type="button" class="ghost" id="share-done">{{ m.close }}</button>
+      </div>
+    </div>
+    <input type="hidden" name="run_id" id="share-run-id">
+    <div id="share-progress" hidden></div>
+  </form>
+</dialog>
+<script>
+  (function () {
+    const dialog = document.getElementById("share-dialog");
+    const form = document.getElementById("share-form");
+    const hint = document.getElementById("share-hint");
+    const progress = document.getElementById("share-progress");
+    const result = document.getElementById("share-result");
+    const urlOut = document.getElementById("share-url");
+    const copyBtn = document.getElementById("share-copy");
+    const closeBtn = document.getElementById("share-close");
+    const doneBtn = document.getElementById("share-done");
+    let currentUrl = "";
+
+    const open = (slug, runId) => {
+      document.getElementById("share-run-id").value = runId;
+      hint.textContent = "";
+      result.hidden = true;
+      progress.hidden = false;
+      progress.textContent = "Создаём ссылку…";
+      dialog.showModal();
+      makeShare(slug, runId);
+    };
+
+    const makeShare = async (slug, runId) => {
+      const ttl = (form.querySelector("input[name='ttl_hours']:checked") || {}).value || "0";
+      const body = new URLSearchParams();
+      body.append("ttl_hours", ttl);
+      const res = await fetch(`/projects/${slug}/runs/${runId}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" },
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      currentUrl = data.url || "";
+      progress.hidden = true;
+      if (!currentUrl) { hint.textContent = "Не удалось создать ссылку"; return; }
+      urlOut.textContent = currentUrl;
+      result.hidden = false;
+    };
+
+    form.addEventListener("change", (event) => {
+      if (event.target.name === "ttl_hours") {
+        const runId = document.getElementById("share-run-id").value;
+        const slug = [...document.querySelectorAll(".share-open")].find((b) => b.dataset.run === runId)?.dataset.slug;
+        if (slug) makeShare(slug, runId);
+      }
+    });
+
+    copyBtn.addEventListener("click", () => {
+      if (currentUrl) navigator.clipboard.writeText(location.origin + currentUrl);
+    });
+    closeBtn.addEventListener("click", () => dialog.close());
+    doneBtn.addEventListener("click", () => dialog.close());
+
+    document.querySelectorAll(".share-open").forEach((btn) => {
+      btn.addEventListener("click", () => open(btn.dataset.slug, btn.dataset.run));
+    });
+  })();
+</script>
+{% endblock %}
