@@ -15,7 +15,7 @@ env/
 # Рантайм-данные приложения (БД, загруженные отчёты, результаты прогонов)
 # Эти каталоги создаются при запуске и содержат живые данные — не в git.
 /data/
-design/app/data/
+backend/data/
 **/data/projects/
 *.sqlite3
 *.db
@@ -30,7 +30,9 @@ dist/
 .env
 .env.*
 !.env.example
-.cursor/
 .idea/
 .vscode/
 .DS_Store
+
+# Self-signed dev-сертификаты Keycloak.
+deploy/keycloak/tls/

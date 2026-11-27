@@ -6,7 +6,7 @@ import threading
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
-from server import settings
+from server import migrations, settings
 
 _lock = threading.Lock()
 
@@ -39,76 +39,8 @@ def connect():
 
 def init() -> list[tuple[str, str]]:
     with connect() as conn:
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS projects (
-                id INTEGER PRIMARY KEY,
-                slug TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                keep_reports INTEGER NOT NULL,
-                created_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS tokens (
-                id INTEGER PRIMARY KEY,
-                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-                name TEXT NOT NULL,
-                token_hash TEXT UNIQUE NOT NULL,
-                token_prefix TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS runs (
-                id TEXT PRIMARY KEY,
-                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-                build_order INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                status TEXT NOT NULL,
-                error TEXT,
-                executor_name TEXT,
-                executor_url TEXT,
-                executor_type TEXT,
-                branch TEXT,
-                passed INTEGER NOT NULL DEFAULT 0,
-                failed INTEGER NOT NULL DEFAULT 0,
-                broken INTEGER NOT NULL DEFAULT 0,
-                skipped INTEGER NOT NULL DEFAULT 0,
-                unknown INTEGER NOT NULL DEFAULT 0,
-                total INTEGER NOT NULL DEFAULT 0
-            );
-            CREATE TABLE IF NOT EXISTS shares (
-                token TEXT PRIMARY KEY,
-                run_id TEXT NOT NULL UNIQUE REFERENCES runs(id) ON DELETE CASCADE,
-                created_at TEXT NOT NULL,
-                expires_at TEXT
-            );
-            CREATE INDEX IF NOT EXISTS runs_project_order ON runs(project_id, build_order DESC);
-            CREATE TABLE IF NOT EXISTS run_parts (
-                run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-                source TEXT NOT NULL,
-                passed INTEGER NOT NULL DEFAULT 0,
-                failed INTEGER NOT NULL DEFAULT 0,
-                broken INTEGER NOT NULL DEFAULT 0,
-                skipped INTEGER NOT NULL DEFAULT 0,
-                unknown INTEGER NOT NULL DEFAULT 0,
-                total INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (run_id, source)
-            );
-            """
-        )
-        # Миграция для существующих БД: колонка expires_at (срок жизни гостевой ссылки).
-        cols = {row["name"] for row in conn.execute("PRAGMA table_info(shares)").fetchall()}
-        if "expires_at" not in cols:
-            conn.execute("ALTER TABLE shares ADD COLUMN expires_at TEXT")
-        # Миграция для существующих БД: колонка branch (ветка, из которой пришёл прогон).
-        run_cols = {row["name"] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
-        if "branch" not in run_cols:
-            conn.execute("ALTER TABLE runs ADD COLUMN branch TEXT")
+        # Схема и последующие миграции — отдельными файлами в server/migrations/.
+        migrations.apply(conn, now)
         stuck = conn.execute(
             """
             SELECT runs.id AS id, projects.slug AS slug

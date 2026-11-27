@@ -402,7 +402,7 @@ class TestDesignShareReports:
         # Гость (свежая сессия без входа) открывает отчёт через /s/{token}.
         client.post("/logout", follow_redirects=False)
         guest = client.get(share_url, follow_redirects=False)
-        assert guest.status_code == 303  # редирект на отчёт
+        assert guest.status_code == 303
         report = client.get(guest.headers["location"])
         assert report.status_code == 200
 
@@ -449,7 +449,7 @@ class TestDesignShareReports:
 
 
 class TestDesignApi:
-    """API-контракт для дизайн-фронта (design/index.html): список /api/projects."""
+    """API-контракт для SPA-фронта (web/index.html): список /api/projects."""
 
     def _zip(self) -> bytes:
         buf = io.BytesIO()
@@ -500,14 +500,9 @@ class TestDesignApi:
         assert "auth" in response.headers.get("location", "") or "/login" in response.headers.get("location", "")
 
     def test_design_assets_served(self, client):
-        """Дизайн-фронт не имеет права отдавать 404 на свои скрипты (иначе чёрный экран)."""
+        """Дизайн-фронт должен отдаваться без 404 на свои ресурсы (иначе чёрный экран)."""
         login(client)
-        # index.html
+        # index.html — отдаёт SPA, и в нём больше нет внешнего scripts/projects.js.
         response = client.get("/")
         assert response.status_code == 200
-        assert "projects.js" in response.text
-        # projects.js (и с query, как грузит браузер) должен отдаваться, иначе скрипт не выполнится.
-        for url in ("/projects.js", "/projects.js?v=2"):
-            asset = client.get(url)
-            assert asset.status_code == 200, f"{url} должен отдаваться"
-            assert asset.headers["content-type"].startswith("text/javascript")
+        assert "projects.js" not in response.text

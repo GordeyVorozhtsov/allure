@@ -6,7 +6,7 @@ __pycache__
 *.pyc
 .pytest_cache
 data
-design/app/data
+backend/data
 allure-report
 deploy
 *.db
