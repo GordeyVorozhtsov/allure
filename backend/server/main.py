@@ -28,7 +28,6 @@ from server.i18n import messages
 
 log = logging.getLogger("allure3")
 
-# --- Keycloak OAuth-вход ---
 KEYCLOAK_ISSUER = os.environ.get("KEYCLOAK_ISSUER", "http://127.0.0.1:8088/realms/allure")
 KEYCLOAK_INTERNAL_ISSUER = os.environ.get("KEYCLOAK_INTERNAL_ISSUER", KEYCLOAK_ISSUER)
 KEYCLOAK_CLIENT = os.environ.get("KEYCLOAK_CLIENT", "allure")
@@ -390,18 +389,7 @@ def home(request: Request):
     actor = require_page(request)
     if isinstance(actor, RedirectResponse):
         return actor
-    return FileResponse(settings.ROOT.parent / "index.html")
-
-
-@app.get("/projects.js")
-def design_projects_js(request: Request):
-    """Дизайн-статика: projects.js рядом с index.html.
-
-    Раньше её отдавал статический прототип (serve.py), который мы удалили, —
-    в FastAPI-бэкенде файл почти пустой (let projects = []; данные грузятся
-    по /api/projects), но без него браузер не выполнит скрипт приложения.
-    """
-    return FileResponse(settings.ROOT.parent / "projects.js", media_type="text/javascript")
+    return FileResponse(settings.ROOT.parent / "web" / "index.html")
 
 
 @app.post("/projects")
@@ -698,7 +686,7 @@ async def create_token(slug: str, request: Request):
 
 @app.post("/api/projects/{slug}/token")
 async def api_issue_token(slug: str, request: Request):
-    """JSON-выпуск CI-токена для дизайн-фронта (возвращает token напрямую)."""
+    """JSON-выпуск CI-токена для SPA-фронта (возвращает token напрямую)."""
     actor = require_api(request)
     project = db.get_project(slug)
     if project is None:
@@ -761,14 +749,14 @@ async def share_run(slug: str, run_id: str, request: Request):
     if run["status"] != "ready":
         set_flash(request, "err", "Гостевая ссылка есть только у собранного отчёта")
         return RedirectResponse(f"/projects/{slug}", status_code=303)
-    # Срок действия ссылки: 24 часа, 7 дней или бессрочно (0).
+    # Срок действия ссылки: 24 часа или 7 дней.
     form = await request.form()
     try:
-        ttl = int(str(form.get("ttl_hours") or "").strip() or 0)
+        ttl = int(str(form.get("ttl_hours") or "").strip() or "24")
     except (TypeError, ValueError):
-        ttl = 0
-    if ttl not in {0, 24, 168}:
-        ttl = 0
+        ttl = 24
+    if ttl not in {24, 168}:
+        ttl = 24
     token = db.set_share(run_id, ttl_hours=ttl)
     share_url = f"/s/{token}"
     if request.headers.get("accept", "").find("application/json") != -1:
@@ -880,7 +868,7 @@ def api_project(slug: str, request: Request):
 
 @app.get("/api/projects")
 def api_projects(request: Request):
-    """Список проектов в форме, совместимой с дизайн-фронтом design/index.html."""
+    """Список проектов в форме, совместимой с SPA-фронтом web/index.html."""
     actor = require_api(request)
     result = []
     for project in db.list_projects(None if actor.is_admin else actor.project_id):

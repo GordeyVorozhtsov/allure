@@ -45,8 +45,10 @@
     .more-pop, .project-menu { display: none; }
     .more:hover .more-pop, .more:focus-within .more-pop { display: block; }
     .project-switch { position: relative; }
-    .project-menu { position: absolute; left: 0; top: 100%; z-index: 40; padding-top: .35rem; min-width: 12rem; }
+    .project-menu { position: absolute; left: 0; top: 100%; z-index: 40; padding-top: .35rem; min-width: 13rem; }
     .project-switch:hover .project-menu, .project-switch:focus-within .project-menu { display: block; }
+    .project-menu .jump[aria-current="true"] { background: rgba(63,157,74,.12); color: #1d6b45; }
+    html.dark .project-menu .jump[aria-current="true"] { color: #6fc47d; }
     .switch { position: relative; display: inline-flex; align-items: center; width: 4.6rem; height: 2rem; padding: .16rem; border-radius: 999px; border: 1px solid var(--line); background: var(--field); color: var(--muted); }
     .switch-side, .lang-switch button { position: relative; z-index: 1; flex: 1; display: grid; place-items: center; height: 100%; color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .04em; line-height: 1; background: none; border: 0; padding: 0; }
     .switch-knob { position: absolute; top: .16rem; left: .16rem; width: calc(50% - .16rem); height: calc(100% - .32rem); border-radius: 999px; background: var(--pass-bar); transition: transform .28s ease, background-color .45s ease; }
@@ -61,10 +63,14 @@
 <body class="h-full bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
   <header class="sticky top-0 z-20 border-b border-zinc-200/80 bg-zinc-50/85 backdrop-blur dark:border-white/10 dark:bg-zinc-950/80">
     <div class="mx-auto flex h-14 max-w-6xl items-center gap-3 px-5">
-      <div class="project-switch flex min-w-0 items-center gap-2">
+      <div class="flex min-w-0 items-center">
         <a href="#projects" id="brand" class="text-[15px] font-semibold tracking-tight">Allure&lt;3</a>
-        <span class="text-sm text-zinc-500" id="crumb"></span>
-        <div class="project-menu" id="project-menu"></div>
+        <span class="ml-1.5 hidden select-none text-sm text-zinc-400" id="crumb-slash">/</span>
+        <div class="project-switch relative ml-1.5 flex min-w-0 items-center">
+          <button type="button" id="crumb" class="current-project truncate text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"></button>
+          <svg viewBox="0 0 24 24" class="ml-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+          <div class="project-menu" id="project-menu"></div>
+        </div>
       </div>
       <div class="ml-auto flex items-center gap-2">
         <button type="button" class="switch" id="theme" aria-pressed="false" aria-label="Theme">
@@ -94,10 +100,9 @@
     </form>
     <div class="px-5 pb-5">
       <p id="expiry-label" class="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Срок</p>
-      <div class="grid grid-cols-3 gap-2" id="expiry" role="radiogroup" aria-label="Срок действия ссылки">
+      <div class="grid grid-cols-2 gap-2" id="expiry" role="radiogroup" aria-label="Срок действия ссылки">
         <button type="button" data-ttl="24h" class="expiry rounded-lg border px-2 py-2 text-sm">24 часа</button>
         <button type="button" data-ttl="7d" class="expiry rounded-lg border px-2 py-2 text-sm">7 дней</button>
-        <button type="button" data-ttl="never" class="expiry rounded-lg border px-2 py-2 text-sm">Бессрочно</button>
       </div>
       <label id="link-label" class="mt-4 block text-xs font-medium uppercase tracking-wide text-zinc-500" for="share-url">Ссылка</label>
       <div class="mt-2 grid gap-2">
@@ -170,8 +175,10 @@
     </div>
   </dialog>
 
-  <script src="projects.js?v=2"></script>
   <script>
+
+    // Реальные данные подгружаются с бэкенда по GET /api/projects (см. init внизу).
+    let projects = [];
 
     const I18N = {
       ru: {
@@ -181,7 +188,7 @@
         tests: "Тесты: passed / failed / skipped.", theme: "Тема", lang: "Язык",
         shareTitle: "Гостевая ссылка", shareHelp: "Откроется без входа в Keycloak.",
         expiry: "Срок", link: "Ссылка", copy: "Скопировать ссылку", copied: "Ссылка скопирована",
-        close: "Закрыть", h24: "24 часа", d7: "7 дней", never: "Бессрочно",
+        close: "Закрыть", h24: "24 часа", d7: "7 дней",
         gitlab: "GitLab", gitlabHelp: "Люди входят через Keycloak. Джоба не входит туда: в CI кладётся токен проекта, zip уходит заголовком X-API-Token.",
         token: "Токен для CI", issue: "Выпустить", name: "Имя проекта", save: "Сохранить", cancel: "Отмена",
         zip: "Загрузить ZIP", drop: "Перетащите архив из GitLab или выберите файл",
@@ -201,7 +208,7 @@
         tests: "Tests: passed / failed / skipped.", theme: "Theme", lang: "Language",
         shareTitle: "Guest link", shareHelp: "Opens without a Keycloak login.",
         expiry: "Expiry", link: "Link", copy: "Copy link", copied: "Link copied",
-        close: "Close", h24: "24 hours", d7: "7 days", never: "Forever",
+        close: "Close", h24: "24 hours", d7: "7 days",
         gitlab: "GitLab", gitlabHelp: "People sign in with Keycloak. The job does not: CI stores a project token and posts the zip with X-API-Token.",
         token: "CI token", issue: "Issue", name: "Project name", save: "Save", cancel: "Cancel",
         zip: "Upload ZIP", drop: "Drop a GitLab archive or choose a file",
@@ -220,6 +227,8 @@
 
     const app = document.getElementById("app");
     const crumb = document.getElementById("crumb");
+    const crumbSlash = document.getElementById("crumb-slash");
+    const projectSwitch = document.querySelector(".project-switch");
     let current = null;
     let currentBranch = null;
     let ttl = "7d";
@@ -259,7 +268,7 @@
     });
     function fillProjectMenu() {
       document.getElementById("project-menu").innerHTML = `<div class="grid rounded-lg border border-[#e6dccb] bg-[#faf6f0] p-1 text-sm shadow-lg dark:border-white/10 dark:bg-zinc-900">
-        ${projects.map((project) => `<button type="button" class="jump rounded-md px-2 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/10" data-slug="${esc(project.slug)}">${esc(project.name)}</button>`).join("")}
+        ${projects.map((project) => `<button type="button" class="jump rounded-md px-2 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/10" data-slug="${esc(project.slug)}" aria-current="${project.slug === current ? "true" : "false"}">${esc(project.name)}</button>`).join("")}
       </div>`;
     }
     document.getElementById("project-menu").addEventListener("click", (event) => {
@@ -279,8 +288,8 @@
         const node = document.getElementById(id);
         if (node) node.textContent = t(key);
       });
-      const expiry = ["24h", "7d", "never"];
-      const keys = ["h24", "d7", "never"];
+      const expiry = ["24h", "7d"];
+      const keys = ["h24", "d7"];
       document.querySelectorAll(".expiry").forEach((button, index) => { button.textContent = t(keys[expiry.indexOf(button.dataset.ttl)]); });
       const ciToken = document.getElementById("ci-token");
       if (ciToken && (!ciToken.value || ciToken.value === "ещё не выпущен" || ciToken.value === "not issued yet")) {
@@ -356,6 +365,8 @@
       history.replaceState(null, "", "#projects");
       document.title = "Allure<3 — " + t("projects");
       crumb.textContent = "";
+      projectSwitch.style.display = "none";
+      crumbSlash.style.display = "none";
       fillProjectMenu();
       app.innerHTML = `
         <div class="mb-6 flex items-start justify-between gap-4">
@@ -423,7 +434,9 @@
       if (isOpening) currentBranch = projectBranches(project)[0] || null;
       history.replaceState(null, "", "#project/" + slug);
       document.title = project.name + " — Allure<3";
-      crumb.textContent = "/ " + project.name;
+      crumb.textContent = project.name;
+      projectSwitch.style.display = "flex";
+      crumbSlash.style.display = "inline";
       fillProjectMenu();
       const branches = projectBranches(project);
       const runs = (currentBranch ? project.runs.filter((item) => item.branch === currentBranch) : project.runs);
@@ -585,7 +598,7 @@
     }
 
     let shareUrl = null;
-    const ttlHours = { "24h": 24, "7d": 168, "never": 0 };
+    const ttlHours = { "24h": 24, "7d": 168 };
 
     async function createShare() {
       if (!shareRun || !current) return;
@@ -704,15 +717,14 @@
     }).catch(() => {});
     applyStatic();
 
-    // Основной источник — реальные данные с бэкенда (заменяет мок projects.js).
+    // Основной источник — реальные данные с бэкенда.
     function renderRoute() {
       fillProjectMenu();
       if (location.hash.startsWith("#project/")) showProject(location.hash.slice(9));
       else showProjects();
     }
 
-    // Сначала рендерим то, что есть (пусть и пусто), чтобы страница не была пустой;
-    // затем грузим реальные проекты и перерисовываем.
+    // Рендерим текущее состояние, затем грузим реальные проекты и перерисовываем.
     renderRoute();
     fetch("/api/projects", { headers: { "Accept": "application/json" } })
       .then((response) => {

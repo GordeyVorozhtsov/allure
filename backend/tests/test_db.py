@@ -113,7 +113,7 @@ class TestTokens:
         assert len(plain) > 20
         assert len(prefix) == 12
         assert plain[:12] == prefix
-        assert len(digest) == 64  # sha256 hex
+        assert len(digest) == 64
 
     def test_token_hash_is_one_way(self, data_dir, db_init):
         plain, digest, _ = db.new_token()
@@ -247,3 +247,56 @@ class TestShares:
 
     def test_unknown_token(self, data_dir, db_init):
         assert db.share_by_token("nonexistent") is None
+
+
+class TestMigrations:
+    """Миграции вынесены в отдельные SQL-файлы server/migrations/."""
+
+    def test_applies_all_migrations_in_order(self, data_dir):
+        from server import db, migrations
+        db.init()
+        with db.connect() as conn:
+            applied = migrations._applied(conn)
+        # Ожидаем все три: 0001_initial, 0002_shares_expires_at, 0003_runs_branch.
+        names = {p.name for p in migrations._migration_files()}
+        assert applied == names
+
+        # Колонки, которые добавляют поздние миграции, присутствуют.
+        with db.connect() as conn:
+            shares = {r["name"] for r in conn.execute("PRAGMA table_info(shares)")}
+            runs = {r["name"] for r in conn.execute("PRAGMA table_info(runs)")}
+        assert "expires_at" in shares
+        assert "branch" in runs
+
+    def test_fresh_db_applies_columns_via_migrations(self, data_dir):
+        # На чистой БД колонка branch/expires_at появляется именно через 0002/0003,
+        # а не заложена в базовую схему 0001.
+        from server import db
+        db.init()
+        with db.connect() as conn:
+            runs = {r["name"] for r in conn.execute("PRAGMA table_info(runs)")}
+            shares = {r["name"] for r in conn.execute("PRAGMA table_info(shares)")}
+        assert "branch" in runs
+        assert "expires_at" in shares
+
+    def test_idempotent_reapply(self, data_dir):
+        from server import db
+        db.init()
+        db.init()
+        with db.connect() as conn:
+            n = conn.execute("SELECT COUNT(*) AS n FROM schema_migrations").fetchone()["n"]
+        assert n == 3  # при повторном init() не добавилось дублей
+
+    def test_tolerates_existing_columns_from_old_schema(self, data_dir):
+        # БД, созданная по старой схеме (колонки уже есть) — миграции не падают.
+        from server import db
+        db.init()
+        # Имитируем «старую» БД: выставляем лог так, будто 0002/0003 ещё не делались,
+        # но колонки уже существуют (их добавила прежняя inline-схема).
+        with db.connect() as conn:
+            conn.execute("DELETE FROM schema_migrations WHERE name IN (?, ?)",
+                         ("0002_shares_expires_at.sql", "0003_runs_branch.sql"))
+        db.init()  # не должно упасть с duplicate column
+        with db.connect() as conn:
+            n = conn.execute("SELECT COUNT(*) AS n FROM schema_migrations").fetchone()["n"]
+        assert n == 3

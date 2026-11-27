@@ -1,7 +1,3 @@
-# Стенд 8090: полноценный бэкенд Allure<3 (FastAPI) + дизайн-фронт index.html.
-# Бэкенд-пакет живёт в design/app/server (импортируется как `server`), дизайн-интерфейс — в design/.
-# Для сборки Allure-отчётов нужен тот же runtime, что и у бэкенда 8070: Java + allure2 + Node + allure3.
-
 FROM python:3.12-slim-bookworm
 
 ARG ALLURE_VERSION=2.46.1
@@ -26,10 +22,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY design ./design
+COPY backend ./backend
+COPY web ./web
 
-# Рабочая директория — там, где лежит пакет `server` (design/app) для импорта.
-WORKDIR /app/design/app
+WORKDIR /app/backend
 RUN pip install --no-cache-dir -r requirements.txt
 
 ENV DATA_DIR=/data \
